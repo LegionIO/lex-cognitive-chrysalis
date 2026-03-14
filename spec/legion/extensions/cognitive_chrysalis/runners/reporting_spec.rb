@@ -1,81 +1,81 @@
 # frozen_string_literal: true
 
-require 'legion/extensions/cognitive_chrysalis/client'
+# Tests focused on status reporting and list operations
+RSpec.describe 'Metamorphosis status reporting' do
+  let(:engine) { Legion::Extensions::CognitiveChrysalis::Helpers::MetamorphosisEngine.new }
+  let(:runner) { Legion::Extensions::CognitiveChrysalis::Runners::CognitiveChrysalis }
 
-RSpec.describe Legion::Extensions::CognitiveChrysalis::Runners::Reporting do
-  let(:engine) { Legion::Extensions::CognitiveChrysalis::Helpers::ChrysalisEngine.new }
-  let(:client) { Legion::Extensions::CognitiveChrysalis::Client.new(engine: engine) }
-  let(:phase_mod) { Legion::Extensions::CognitiveChrysalis::Helpers::TransformationPhase }
-
-  def make_phase(name, duration_ticks)
-    phase_mod.new_phase(name: name, duration_ticks: duration_ticks)
-  end
-
-  describe '#transformation_history' do
-    it 'returns success with empty history initially' do
-      result = client.transformation_history
+  describe 'list_chrysalises' do
+    it 'returns empty list for a fresh engine' do
+      result = runner.list_chrysalises(engine: engine)
       expect(result[:success]).to be true
+      expect(result[:chrysalises]).to eq([])
       expect(result[:count]).to eq(0)
-      expect(result[:history]).to eq([])
     end
 
-    it 'includes completed transformations' do
-      started = client.begin_transformation(trigger: 'test', domain: :analytical,
-                                            phases: [make_phase(:emergence, 1)])
-      client.advance_cycle(cycle_id: started[:cycle_id])
-      result = client.transformation_history
-      expect(result[:count]).to eq(1)
-      expect(result[:history].first[:domain]).to eq(:analytical)
-    end
-  end
-
-  describe '#most_transformed_domains' do
-    it 'returns success with empty domains initially' do
-      result = client.most_transformed_domains
-      expect(result[:success]).to be true
-      expect(result[:domains]).to eq({})
-    end
-  end
-
-  describe '#metamorphic_readiness' do
-    it 'returns success with readiness score' do
-      result = client.metamorphic_readiness
-      expect(result[:success]).to be true
-      expect(result[:readiness]).to be_a(Float)
-      expect(result[:label]).not_to be_nil
+    it 'lists all created chrysalises with their hashes' do
+      runner.create_chrysalis(chrysalis_type: :silk, content: 'alpha', engine: engine)
+      runner.create_chrysalis(chrysalis_type: :paper, content: 'beta', engine: engine)
+      result = runner.list_chrysalises(engine: engine)
+      expect(result[:count]).to eq(2)
+      types = result[:chrysalises].map { |c| c[:chrysalis_type] }
+      expect(types).to contain_exactly(:silk, :paper)
     end
 
-    it 'returns :dormant when cooldown is active' do
-      engine.instance_variable_set(:@cooldown_remaining, 5)
-      result = client.metamorphic_readiness
-      expect(result[:readiness]).to eq(0.0)
-      expect(result[:label]).to eq(:dormant)
+    it 'includes chrysalis details in each entry' do
+      runner.create_chrysalis(chrysalis_type: :bark, content: 'idea', engine: engine)
+      c = runner.list_chrysalises(engine: engine)[:chrysalises].first
+      expect(c).to have_key(:id)
+      expect(c).to have_key(:stage)
+      expect(c).to have_key(:transformation_progress)
+      expect(c).to have_key(:beauty)
     end
   end
 
-  describe '#chrysalis_report' do
-    it 'returns success with full report' do
-      result = client.chrysalis_report
-      expect(result[:success]).to be true
-      report = result[:report]
-      expect(report[:active_cycles]).to eq(0)
-      expect(report[:completed_cycles]).to eq(0)
-      expect(report[:readiness_label]).not_to be_nil
-    end
-  end
-
-  describe '#tick_cooldown' do
-    it 'decrements cooldown and returns success' do
-      engine.instance_variable_set(:@cooldown_remaining, 3)
-      result = client.tick_cooldown
-      expect(result[:success]).to be true
-      expect(result[:cooldown_remaining]).to eq(2)
+  describe 'metamorphosis_status' do
+    it 'returns success: true' do
+      expect(runner.metamorphosis_status(engine: engine)[:success]).to be true
     end
 
-    it 'handles zero cooldown gracefully' do
-      result = client.tick_cooldown
-      expect(result[:success]).to be true
-      expect(result[:cooldown_remaining]).to eq(0)
+    it 'shows zeroed counts for empty engine' do
+      status = runner.metamorphosis_status(engine: engine)
+      expect(status[:total_chrysalises]).to eq(0)
+      expect(status[:butterflies_count]).to eq(0)
+      expect(status[:premature_count]).to eq(0)
+    end
+
+    it 'shows correct butterflies_count after natural emergence' do
+      cid = runner.create_chrysalis(chrysalis_type: :leaf, content: 'c', engine: engine)[:chrysalis][:id]
+      coc = runner.create_cocoon(environment: 'park', engine: engine)[:cocoon][:id]
+      runner.enclose(chrysalis_id: cid, cocoon_id: coc, engine: engine)
+      12.times { runner.incubate(chrysalis_id: cid, engine: engine) }
+      runner.emerge(chrysalis_id: cid, engine: engine)
+      expect(runner.metamorphosis_status(engine: engine)[:butterflies_count]).to eq(1)
+    end
+
+    it 'shows correct premature_count after forced emergence' do
+      cid = runner.create_chrysalis(chrysalis_type: :silk, content: 'forced', engine: engine)[:chrysalis][:id]
+      runner.emerge(chrysalis_id: cid, force: true, engine: engine)
+      expect(runner.metamorphosis_status(engine: engine)[:premature_count]).to eq(1)
+    end
+
+    it 'includes total_cocoons' do
+      runner.create_cocoon(environment: 'a', engine: engine)
+      runner.create_cocoon(environment: 'b', engine: engine)
+      expect(runner.metamorphosis_status(engine: engine)[:total_cocoons]).to eq(2)
+    end
+
+    it 'includes avg_beauty as 0.0 when no butterflies' do
+      runner.create_chrysalis(chrysalis_type: :bark, content: 'c', engine: engine)
+      expect(runner.metamorphosis_status(engine: engine)[:avg_beauty]).to eq(0.0)
+    end
+
+    it 'includes avg_progress > 0.0 after incubation' do
+      cid = runner.create_chrysalis(chrysalis_type: :paper, content: 'p', engine: engine)[:chrysalis][:id]
+      coc = runner.create_cocoon(environment: 'env', engine: engine)[:cocoon][:id]
+      runner.enclose(chrysalis_id: cid, cocoon_id: coc, engine: engine)
+      runner.incubate(chrysalis_id: cid, engine: engine)
+      expect(runner.metamorphosis_status(engine: engine)[:avg_progress]).to be > 0.0
     end
   end
 end

@@ -5,53 +5,38 @@ module Legion
     module CognitiveChrysalis
       module Helpers
         module Constants
-          MAX_CYCLES            = 50
-          MAX_PHASES_PER_CYCLE  = 8
-          DEFAULT_INTENSITY     = 0.5
-          DISSOLUTION_RATE      = 0.12
-          REFORMATION_RATE      = 0.08
-          EMERGENCE_THRESHOLD   = 0.9
-          COOLDOWN_CYCLES       = 10
+          LIFE_STAGES = %i[larva spinning cocooned transforming emerging butterfly].freeze
+          CHRYSALIS_TYPES = %i[silk paper bark leaf underground].freeze
 
-          PHASE_NAMES = %i[larval growth dissolution chrysalis reformation emergence].freeze
+          MAX_CHRYSALISES    = 200
+          MAX_BUTTERFLIES    = 500
+          TRANSFORMATION_RATE = 0.08
+          PROTECTION_DECAY = 0.03
+          EMERGENCE_THRESHOLD = 0.9
+          PREMATURE_PENALTY = 0.4
 
-          TRANSFORMATION_DOMAINS = %i[
-            cognitive
-            emotional
-            behavioral
-            relational
-            creative
-            analytical
-            moral
-            fundamental
-          ].freeze
-
-          INTENSITY_LABELS = {
-            (0.0..0.25)  => :subtle,
-            (0.25..0.50) => :moderate,
-            (0.50..0.75) => :significant,
-            (0.75..1.0)  => :profound
+          STAGE_LABELS = {
+            (0.0...0.20)  => :larva,
+            (0.20...0.40) => :spinning,
+            (0.40...0.60) => :cocooned,
+            (0.60...0.80) => :transforming,
+            (0.80...0.90) => :emerging,
+            (0.90..1.0)   => :butterfly
           }.freeze
 
-          PROGRESS_LABELS = {
-            (0.0..0.25)  => :beginning,
-            (0.25..0.50) => :underway,
-            (0.50..0.75) => :deepening,
-            (0.75..1.0)  => :culminating
+          BEAUTY_LABELS = {
+            (0.0...0.20)  => :dull,
+            (0.20...0.40) => :plain,
+            (0.40...0.65) => :striking,
+            (0.65...0.85) => :beautiful,
+            (0.85..1.0)   => :magnificent
           }.freeze
 
-          READINESS_LABELS = {
-            (0.0..0.30)  => :dormant,
-            (0.30..0.60) => :stirring,
-            (0.60..0.85) => :receptive,
-            (0.85..1.0)  => :ready
-          }.freeze
-
-          def self.label_for(labels_hash, value)
-            labels_hash.each do |range, label|
+          def self.label_for(table, value)
+            table.each do |range, label|
               return label if range.cover?(value)
             end
-            labels_hash.values.last
+            table.values.last
           end
         end
       end

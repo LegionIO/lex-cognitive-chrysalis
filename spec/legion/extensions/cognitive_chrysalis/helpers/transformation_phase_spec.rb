@@ -1,124 +1,98 @@
 # frozen_string_literal: true
 
-RSpec.describe Legion::Extensions::CognitiveChrysalis::Helpers::TransformationPhase do
-  let(:mod) { described_class }
+# Tests focused on Cocoon environment modifiers and their effect on transformation
+RSpec.describe 'Cocoon environment effects' do
+  let(:engine) { Legion::Extensions::CognitiveChrysalis::Helpers::MetamorphosisEngine.new }
 
-  describe '.new_phase' do
-    it 'creates a valid phase hash' do
-      phase = mod.new_phase(name: :larval, duration_ticks: 10)
-      expect(phase[:name]).to eq(:larval)
-      expect(phase[:duration_ticks]).to eq(10)
-      expect(phase[:intensity]).to eq(0.5)
-      expect(phase[:domain]).to eq(:cognitive)
-      expect(phase[:ticks_elapsed]).to eq(0)
-      expect(phase[:started_at]).to be_nil
-      expect(phase[:completed_at]).to be_nil
+  describe 'ideal cocoon' do
+    let(:ideal_cocoon) do
+      Legion::Extensions::CognitiveChrysalis::Helpers::Cocoon.new(
+        environment: 'greenhouse',
+        temperature: 0.55,
+        humidity:    0.55
+      )
     end
 
-    it 'accepts custom intensity and domain' do
-      phase = mod.new_phase(name: :chrysalis, duration_ticks: 5, intensity: 0.8, domain: :emotional)
-      expect(phase[:intensity]).to eq(0.8)
-      expect(phase[:domain]).to eq(:emotional)
+    it 'reports ideal? true' do
+      expect(ideal_cocoon.ideal?).to be true
     end
 
-    it 'clamps intensity to 0.0..1.0' do
-      phase = mod.new_phase(name: :growth, duration_ticks: 3, intensity: 2.5)
-      expect(phase[:intensity]).to eq(1.0)
+    it 'has growth_modifier of 0.1' do
+      expect(ideal_cocoon.growth_modifier).to eq(0.1)
     end
 
-    it 'clamps duration_ticks minimum to 1' do
-      phase = mod.new_phase(name: :emergence, duration_ticks: -5)
-      expect(phase[:duration_ticks]).to eq(1)
-    end
-
-    it 'raises on invalid phase name' do
-      expect { mod.new_phase(name: :invalid_phase, duration_ticks: 5) }.to raise_error(ArgumentError, /invalid phase name/)
-    end
-
-    it 'raises on invalid domain' do
-      expect { mod.new_phase(name: :larval, duration_ticks: 5, domain: :unknown) }.to raise_error(ArgumentError, /invalid domain/)
-    end
-
-    it 'accepts description' do
-      phase = mod.new_phase(name: :reformation, duration_ticks: 8, description: 'rebuilding')
-      expect(phase[:description]).to eq('rebuilding')
+    it 'accelerates transformation compared to bare incubation' do
+      base_rate = Legion::Extensions::CognitiveChrysalis::Helpers::Constants::TRANSFORMATION_RATE
+      rate_with_cocoon = base_rate + ideal_cocoon.growth_modifier
+      expect(rate_with_cocoon).to be > base_rate
     end
   end
 
-  describe '.advance_phase' do
-    it 'increments ticks_elapsed' do
-      phase = mod.new_phase(name: :larval, duration_ticks: 5)
-      advanced = mod.advance_phase(phase)
-      expect(advanced[:ticks_elapsed]).to eq(1)
+  describe 'hostile cocoon' do
+    let(:hostile_cocoon) do
+      Legion::Extensions::CognitiveChrysalis::Helpers::Cocoon.new(
+        environment: 'furnace',
+        temperature: 0.95,
+        humidity:    0.5
+      )
     end
 
-    it 'sets started_at on first advance' do
-      phase = mod.new_phase(name: :larval, duration_ticks: 5)
-      advanced = mod.advance_phase(phase)
-      expect(advanced[:started_at]).not_to be_nil
+    it 'reports hostile? true' do
+      expect(hostile_cocoon.hostile?).to be true
     end
 
-    it 'sets completed_at when duration reached' do
-      phase = mod.new_phase(name: :chrysalis, duration_ticks: 1)
-      advanced = mod.advance_phase(phase)
-      expect(advanced[:completed_at]).not_to be_nil
+    it 'has negative growth_modifier' do
+      expect(hostile_cocoon.growth_modifier).to be < 0
     end
 
-    it 'does not advance a complete phase' do
-      phase = mod.new_phase(name: :larval, duration_ticks: 1)
-      completed = mod.advance_phase(phase)
-      again = mod.advance_phase(completed)
-      expect(again[:ticks_elapsed]).to eq(1)
-    end
-
-    it 'does not mutate the original phase' do
-      phase = mod.new_phase(name: :larval, duration_ticks: 5)
-      mod.advance_phase(phase)
-      expect(phase[:ticks_elapsed]).to eq(0)
+    it 'slows transformation below base rate' do
+      base_rate = Legion::Extensions::CognitiveChrysalis::Helpers::Constants::TRANSFORMATION_RATE
+      rate_with_cocoon = base_rate + hostile_cocoon.growth_modifier
+      expect(rate_with_cocoon).to be < base_rate
     end
   end
 
-  describe '.complete?' do
-    it 'returns false for a new phase' do
-      phase = mod.new_phase(name: :larval, duration_ticks: 5)
-      expect(mod.complete?(phase)).to be false
+  describe 'neutral cocoon' do
+    let(:neutral_cocoon) do
+      Legion::Extensions::CognitiveChrysalis::Helpers::Cocoon.new(
+        environment: 'plain',
+        temperature: 0.2,
+        humidity:    0.5
+      )
     end
 
-    it 'returns true when ticks_elapsed >= duration_ticks' do
-      phase = mod.new_phase(name: :larval, duration_ticks: 1)
-      completed = mod.advance_phase(phase)
-      expect(mod.complete?(completed)).to be true
-    end
-  end
-
-  describe '.progress' do
-    it 'returns 0.0 for new phase' do
-      phase = mod.new_phase(name: :larval, duration_ticks: 10)
-      expect(mod.progress(phase)).to eq(0.0)
+    it 'has growth_modifier of 0.0' do
+      expect(neutral_cocoon.growth_modifier).to eq(0.0)
     end
 
-    it 'returns 0.5 at halfway' do
-      phase = mod.new_phase(name: :larval, duration_ticks: 2)
-      advanced = mod.advance_phase(phase)
-      expect(mod.progress(advanced)).to eq(0.5)
-    end
-
-    it 'returns 1.0 when complete' do
-      phase = mod.new_phase(name: :larval, duration_ticks: 1)
-      completed = mod.advance_phase(phase)
-      expect(mod.progress(completed)).to eq(1.0)
+    it 'does not accelerate or slow transformation' do
+      base_rate = Legion::Extensions::CognitiveChrysalis::Helpers::Constants::TRANSFORMATION_RATE
+      expect(base_rate + neutral_cocoon.growth_modifier).to eq(base_rate)
     end
   end
 
-  describe '.intensity_label' do
-    it 'returns :subtle for default intensity 0.0' do
-      phase = mod.new_phase(name: :larval, duration_ticks: 1, intensity: 0.1)
-      expect(mod.intensity_label(phase)).to eq(:subtle)
+  describe 'temperature and humidity adjustments' do
+    let(:cocoon) { Legion::Extensions::CognitiveChrysalis::Helpers::Cocoon.new(environment: 'test') }
+
+    it 'moisten and dry are inverse operations (roughly)' do
+      original = cocoon.humidity
+      cocoon.moisten!
+      cocoon.dry!
+      expect(cocoon.humidity).to be_within(0.001).of(original)
     end
 
-    it 'returns :profound for high intensity' do
-      phase = mod.new_phase(name: :larval, duration_ticks: 1, intensity: 0.9)
-      expect(mod.intensity_label(phase)).to eq(:profound)
+    it 'warm and cool are inverse operations (roughly)' do
+      original = cocoon.temperature
+      cocoon.warm!
+      cocoon.cool!
+      expect(cocoon.temperature).to be_within(0.001).of(original)
+    end
+
+    it 'sheltering and exposing a chrysalis affects chrysalis_ids' do
+      cocoon.shelter('c-1')
+      expect(cocoon.chrysalis_ids).to include('c-1')
+      cocoon.expose('c-1')
+      expect(cocoon.chrysalis_ids).not_to include('c-1')
     end
   end
 end

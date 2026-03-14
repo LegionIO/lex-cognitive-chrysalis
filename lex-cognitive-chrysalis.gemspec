@@ -14,15 +14,14 @@ Gem::Specification.new do |spec|
   spec.license       = 'MIT'
   spec.required_ruby_version = '>= 3.4'
 
-  spec.metadata['homepage_uri']        = spec.homepage
-  spec.metadata['source_code_uri']     = 'https://github.com/LegionIO/lex-cognitive-chrysalis'
-  spec.metadata['documentation_uri']   = 'https://github.com/LegionIO/lex-cognitive-chrysalis'
-  spec.metadata['changelog_uri']       = 'https://github.com/LegionIO/lex-cognitive-chrysalis'
-  spec.metadata['bug_tracker_uri']     = 'https://github.com/LegionIO/lex-cognitive-chrysalis/issues'
+  spec.metadata['homepage_uri']          = spec.homepage
+  spec.metadata['source_code_uri']       = 'https://github.com/LegionIO/lex-cognitive-chrysalis'
+  spec.metadata['documentation_uri']     = 'https://github.com/LegionIO/lex-cognitive-chrysalis'
+  spec.metadata['changelog_uri']         = 'https://github.com/LegionIO/lex-cognitive-chrysalis'
+  spec.metadata['bug_tracker_uri']       = 'https://github.com/LegionIO/lex-cognitive-chrysalis/issues'
   spec.metadata['rubygems_mfa_required'] = 'true'
 
-  spec.files = Dir.chdir(File.expand_path(__dir__)) do
-    `git ls-files -z`.split("\x0").reject { |f| f.match(%r{^(test|spec|features)/}) }
-  end
+  spec.files = Dir.chdir(__dir__) { `git ls-files -z`.split("\x0") }
+
   spec.require_paths = ['lib']
 end

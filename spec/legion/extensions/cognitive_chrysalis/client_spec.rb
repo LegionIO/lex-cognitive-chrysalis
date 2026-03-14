@@ -1,62 +1,83 @@
 # frozen_string_literal: true
 
-require 'legion/extensions/cognitive_chrysalis/client'
-
 RSpec.describe Legion::Extensions::CognitiveChrysalis::Client do
-  let(:client) { described_class.new }
-  let(:engine) { Legion::Extensions::CognitiveChrysalis::Helpers::ChrysalisEngine.new }
-  let(:client_with_engine) { described_class.new(engine: engine) }
-  let(:phase_mod) { Legion::Extensions::CognitiveChrysalis::Helpers::TransformationPhase }
+  subject(:client) { described_class.new }
 
-  def make_phase(name, ticks)
-    phase_mod.new_phase(name: name, duration_ticks: ticks)
+  it 'responds to create_chrysalis' do
+    expect(client).to respond_to(:create_chrysalis)
   end
 
-  it 'responds to transformation runner methods' do
-    expect(client).to respond_to(:begin_transformation)
-    expect(client).to respond_to(:advance_cycle)
-    expect(client).to respond_to(:offline_capabilities)
-    expect(client).to respond_to(:restore_capabilities)
-    expect(client).to respond_to(:record_emergence)
+  it 'responds to create_cocoon' do
+    expect(client).to respond_to(:create_cocoon)
   end
 
-  it 'responds to reporting runner methods' do
-    expect(client).to respond_to(:transformation_history)
-    expect(client).to respond_to(:most_transformed_domains)
-    expect(client).to respond_to(:metamorphic_readiness)
-    expect(client).to respond_to(:chrysalis_report)
-    expect(client).to respond_to(:tick_cooldown)
+  it 'responds to spin' do
+    expect(client).to respond_to(:spin)
   end
 
-  it 'uses provided engine' do
-    result = client_with_engine.begin_transformation(trigger: 'test', domain: :cognitive)
-    expect(result[:success]).to be true
-    expect(engine.active_cycles.size).to eq(1)
+  it 'responds to enclose' do
+    expect(client).to respond_to(:enclose)
   end
 
-  it 'runs a full metamorphic lifecycle' do
-    phases = [
-      make_phase(:larval, 1),
-      make_phase(:dissolution, 1),
-      make_phase(:chrysalis, 1),
-      make_phase(:reformation, 1),
-      make_phase(:emergence, 1)
-    ]
+  it 'responds to incubate' do
+    expect(client).to respond_to(:incubate)
+  end
 
-    started = client_with_engine.begin_transformation(trigger: 'deep insight', domain: :fundamental, phases: phases)
-    expect(started[:success]).to be true
-    cycle_id = started[:cycle_id]
+  it 'responds to emerge' do
+    expect(client).to respond_to(:emerge)
+  end
 
-    5.times { client_with_engine.advance_cycle(cycle_id: cycle_id) }
+  it 'responds to disturb' do
+    expect(client).to respond_to(:disturb)
+  end
 
-    history = client_with_engine.transformation_history
-    expect(history[:count]).to eq(1)
-    expect(history[:history].first[:status]).to eq(:emerged)
+  it 'responds to list_chrysalises' do
+    expect(client).to respond_to(:list_chrysalises)
+  end
 
-    report = client_with_engine.chrysalis_report
-    expect(report[:report][:completed_cycles]).to eq(1)
-    expect(report[:report][:cooldown_remaining]).to eq(
-      Legion::Extensions::CognitiveChrysalis::Helpers::Constants::COOLDOWN_CYCLES
-    )
+  it 'responds to metamorphosis_status' do
+    expect(client).to respond_to(:metamorphosis_status)
+  end
+
+  it 'exposes the engine as a MetamorphosisEngine' do
+    expect(client.engine).to be_a(Legion::Extensions::CognitiveChrysalis::Helpers::MetamorphosisEngine)
+  end
+
+  it 'uses the same engine for all calls by default' do
+    client.create_chrysalis(chrysalis_type: :silk, content: 'c1')
+    status = client.metamorphosis_status
+    expect(status[:total_chrysalises]).to eq(1)
+  end
+
+  describe 'full lifecycle via client default engine' do
+    it 'creates a chrysalis, encloses it, incubates it, and emerges it' do
+      cid = client.create_chrysalis(chrysalis_type: :silk, content: 'an insight')[:chrysalis][:id]
+      coc = client.create_cocoon(environment: 'forest')[:cocoon][:id]
+      client.enclose(chrysalis_id: cid, cocoon_id: coc)
+      12.times { client.incubate(chrysalis_id: cid) }
+      result = client.emerge(chrysalis_id: cid)
+      expect(result[:stage]).to eq(:butterfly)
+    end
+
+    it 'reports metamorphosis status after activity' do
+      client.create_chrysalis(chrysalis_type: :leaf, content: 'leaf thought')
+      status = client.metamorphosis_status
+      expect(status[:total_chrysalises]).to eq(1)
+    end
+
+    it 'can disturb a cocoon and observe effects' do
+      cid = client.create_chrysalis(chrysalis_type: :underground, content: 'idea')[:chrysalis][:id]
+      coc = client.create_cocoon(environment: 'cave')[:cocoon][:id]
+      client.enclose(chrysalis_id: cid, cocoon_id: coc)
+      result = client.disturb(cocoon_id: coc, force: 1.0)
+      expect(result[:success]).to be true
+    end
+
+    it 'lists created chrysalises' do
+      client.create_chrysalis(chrysalis_type: :bark, content: 'a')
+      client.create_chrysalis(chrysalis_type: :paper, content: 'b')
+      result = client.list_chrysalises
+      expect(result[:count]).to eq(2)
+    end
   end
 end

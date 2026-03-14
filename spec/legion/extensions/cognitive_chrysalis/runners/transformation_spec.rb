@@ -1,72 +1,74 @@
 # frozen_string_literal: true
 
-require 'legion/extensions/cognitive_chrysalis/client'
+# Integration tests for the full metamorphosis pipeline
+RSpec.describe 'Full metamorphosis pipeline integration' do
+  let(:engine) { Legion::Extensions::CognitiveChrysalis::Helpers::MetamorphosisEngine.new }
+  let(:runner) { Legion::Extensions::CognitiveChrysalis::Runners::CognitiveChrysalis }
 
-RSpec.describe Legion::Extensions::CognitiveChrysalis::Runners::Transformation do
-  let(:engine) { Legion::Extensions::CognitiveChrysalis::Helpers::ChrysalisEngine.new }
-  let(:client) { Legion::Extensions::CognitiveChrysalis::Client.new(engine: engine) }
-  let(:phase_mod) { Legion::Extensions::CognitiveChrysalis::Helpers::TransformationPhase }
+  it 'creates and fully transforms a chrysalis through the natural emergence path' do
+    cid = runner.create_chrysalis(chrysalis_type: :silk, content: 'deep insight', engine: engine)[:chrysalis][:id]
+    coc = runner.create_cocoon(environment: 'sacred_grove', engine: engine)[:cocoon][:id]
+    runner.enclose(chrysalis_id: cid, cocoon_id: coc, engine: engine)
 
-  def make_phase(name, duration_ticks)
-    phase_mod.new_phase(name: name, duration_ticks: duration_ticks)
+    # Incubate until ready (needs ~12 steps with base rate 0.08 to exceed 0.9)
+    result = nil
+    12.times { result = runner.incubate(chrysalis_id: cid, engine: engine) }
+    expect(result[:progress]).to be >= Legion::Extensions::CognitiveChrysalis::Helpers::Constants::EMERGENCE_THRESHOLD
+
+    result = runner.emerge(chrysalis_id: cid, engine: engine)
+    expect(result[:success]).to be true
+    expect(result[:stage]).to eq(:butterfly)
+    expect(result[:premature]).to be false
   end
 
-  describe '#begin_transformation' do
-    it 'returns success true with a cycle_id' do
-      result = client.begin_transformation(trigger: 'test', domain: :cognitive)
-      expect(result[:success]).to be true
-      expect(result[:cycle_id]).not_to be_nil
-    end
+  it 'reports correct stats after full transformation' do
+    cid = runner.create_chrysalis(chrysalis_type: :leaf, content: 'wisdom', engine: engine)[:chrysalis][:id]
+    coc = runner.create_cocoon(environment: 'canopy', engine: engine)[:cocoon][:id]
+    runner.enclose(chrysalis_id: cid, cocoon_id: coc, engine: engine)
+    12.times { runner.incubate(chrysalis_id: cid, engine: engine) }
+    runner.emerge(chrysalis_id: cid, engine: engine)
 
-    it 'returns failure when cooldown active' do
-      engine.instance_variable_set(:@cooldown_remaining, 3)
-      result = client.begin_transformation(trigger: 'test', domain: :cognitive)
-      expect(result[:success]).to be false
-      expect(result[:reason]).to eq(:cooldown_active)
-    end
+    status = runner.metamorphosis_status(engine: engine)
+    expect(status[:butterflies_count]).to eq(1)
+    expect(status[:premature_count]).to eq(0)
+    expect(status[:avg_beauty]).to eq(1.0)
   end
 
-  describe '#advance_cycle' do
-    it 'advances an existing cycle' do
-      started = client.begin_transformation(trigger: 'test', domain: :emotional,
-                                            phases: [make_phase(:larval, 5)])
-      result = client.advance_cycle(cycle_id: started[:cycle_id])
-      expect(result[:success]).to be true
-      expect(result[:progress]).to be > 0.0
+  it 'handles multiple concurrent chrysalises in the same engine' do
+    ids = (1..3).map do |i|
+      cid = runner.create_chrysalis(chrysalis_type: :bark, content: "idea #{i}", engine: engine)[:chrysalis][:id]
+      coc = runner.create_cocoon(environment: "env_#{i}", engine: engine)[:cocoon][:id]
+      runner.enclose(chrysalis_id: cid, cocoon_id: coc, engine: engine)
+      cid
     end
 
-    it 'returns failure for unknown cycle' do
-      result = client.advance_cycle(cycle_id: 'unknown')
-      expect(result[:success]).to be false
-      expect(result[:reason]).to eq(:not_found)
-    end
+    12.times { runner.incubate_all(engine: engine) }
+    ids.each { |cid| runner.emerge(chrysalis_id: cid, engine: engine) }
+
+    status = runner.metamorphosis_status(engine: engine)
+    expect(status[:butterflies_count]).to eq(3)
   end
 
-  describe '#offline_capabilities' do
-    it 'records offline capabilities' do
-      started = client.begin_transformation(trigger: 'test', domain: :behavioral)
-      result = client.offline_capabilities(cycle_id: started[:cycle_id], capabilities: ['focus'])
-      expect(result[:success]).to be true
-      expect(result[:offline]).to include('focus')
-    end
+  it 'incubate_all applies modifiers from individual cocoons' do
+    cid1 = runner.create_chrysalis(chrysalis_type: :silk, content: 'c1', engine: engine)[:chrysalis][:id]
+    coc1 = runner.create_cocoon(environment: 'ideal', temperature: 0.55, humidity: 0.55, engine: engine)[:cocoon][:id]
+    runner.enclose(chrysalis_id: cid1, cocoon_id: coc1, engine: engine)
+
+    result = runner.incubate_all(engine: engine)
+    expect(result[:incubated]).to eq(1)
+    c = engine.instance_variable_get(:@chrysalises)[cid1]
+    expect(c.transformation_progress).to be > Legion::Extensions::CognitiveChrysalis::Helpers::Constants::TRANSFORMATION_RATE
   end
 
-  describe '#restore_capabilities' do
-    it 'restores previously offline capabilities' do
-      started = client.begin_transformation(trigger: 'test', domain: :cognitive)
-      client.offline_capabilities(cycle_id: started[:cycle_id], capabilities: ['reasoning'])
-      result = client.restore_capabilities(cycle_id: started[:cycle_id])
-      expect(result[:success]).to be true
-      expect(result[:restored]).to include('reasoning')
-    end
-  end
+  it 'disturbing a cocoon mid-transformation can force premature emergence' do
+    cid = runner.create_chrysalis(chrysalis_type: :underground, content: 'fragile', engine: engine)[:chrysalis][:id]
+    coc = runner.create_cocoon(environment: 'unstable', engine: engine)[:cocoon][:id]
+    runner.enclose(chrysalis_id: cid, cocoon_id: coc, engine: engine)
+    3.times { runner.incubate(chrysalis_id: cid, engine: engine) }
+    runner.disturb(cocoon_id: coc, force: 1.0, engine: engine)
 
-  describe '#record_emergence' do
-    it 'records an emergence event' do
-      started = client.begin_transformation(trigger: 'test', domain: :creative)
-      result = client.record_emergence(cycle_id: started[:cycle_id], insight: 'clarity')
-      expect(result[:success]).to be true
-      expect(result[:event_id]).not_to be_nil
-    end
+    c = engine.instance_variable_get(:@chrysalises)[cid]
+    expect(c.butterfly?).to be true
+    expect(c.premature?).to be true
   end
 end
