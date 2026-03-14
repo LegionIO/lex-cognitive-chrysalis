@@ -69,7 +69,7 @@ RSpec.describe Legion::Extensions::CognitiveChrysalis::Helpers::ChrysalisEngine 
   describe '#offline_capabilities' do
     it 'adds capabilities to dissolution inventory' do
       started = engine.begin_transformation(trigger: 'test', domain: :behavioral)
-      result = engine.offline_capabilities(cycle_id: started[:cycle_id],
+      result = engine.offline_capabilities(cycle_id:     started[:cycle_id],
                                            capabilities: %w[reasoning empathy])
       expect(result[:success]).to be true
       expect(result[:offline]).to include('reasoning', 'empathy')
@@ -144,12 +144,12 @@ RSpec.describe Legion::Extensions::CognitiveChrysalis::Helpers::ChrysalisEngine 
     end
 
     it 'counts transformed domains' do
+      cycle_mod = Legion::Extensions::CognitiveChrysalis::Helpers::MetamorphicCycle
       2.times do
-        started = engine.begin_transformation(trigger: 'test', domain: :cognitive,
-                                              phases: [make_phase(:emergence, 1)])
-        cycle_id = started[:cycle_id]
-        engine.instance_variable_get(:@active_cycles)[cycle_id][:emergence_score] = 0.95
-        engine.advance_cycle(cycle_id: cycle_id)
+        cycle = cycle_mod.new_cycle(trigger: 'test', domain: :cognitive)
+        cycle[:status] = :emerged
+        cycle[:emergence_score] = 0.95
+        engine.completed_cycles << cycle
       end
       domains = engine.most_transformed_domains
       expect(domains[:cognitive]).to eq(2)

@@ -34,18 +34,17 @@ module Legion
             updated = MetamorphicCycle.advance!(cycle)
             @active_cycles[cycle_id] = updated
 
-            if %i[emerged failed].include?(updated[:status])
-              complete_cycle!(cycle_id, updated)
-            end
+            complete_cycle!(cycle_id, updated) if %i[emerged failed].include?(updated[:status])
 
-            Legion::Logging.debug "[chrysalis] advanced cycle=#{cycle_id[0..7]} status=#{updated[:status]} progress=#{MetamorphicCycle.progress(updated).round(3)}"
+            prog = MetamorphicCycle.progress(updated).round(3)
+            Legion::Logging.debug "[chrysalis] advanced cycle=#{cycle_id[0..7]} status=#{updated[:status]} progress=#{prog}"
             {
-              success:          true,
-              cycle_id:         cycle_id,
-              status:           updated[:status],
-              progress:         MetamorphicCycle.progress(updated),
+              success:           true,
+              cycle_id:          cycle_id,
+              status:            updated[:status],
+              progress:          MetamorphicCycle.progress(updated),
               dissolution_depth: MetamorphicCycle.dissolution_depth(updated),
-              emergence_score:  MetamorphicCycle.emergence_readiness(updated)
+              emergence_score:   MetamorphicCycle.emergence_readiness(updated)
             }
           end
 
@@ -85,23 +84,23 @@ module Legion
           def transformation_history
             @completed_cycles.map do |c|
               {
-                cycle_id:         c[:cycle_id],
-                domain:           c[:domain],
-                trigger:          c[:trigger],
-                status:           c[:status],
+                cycle_id:          c[:cycle_id],
+                domain:            c[:domain],
+                trigger:           c[:trigger],
+                status:            c[:status],
                 dissolution_depth: MetamorphicCycle.dissolution_depth(c),
-                emergence_score:  MetamorphicCycle.emergence_readiness(c),
-                transformed:      MetamorphicCycle.transformed?(c),
-                completed_at:     c[:completed_at]
+                emergence_score:   MetamorphicCycle.emergence_readiness(c),
+                transformed:       MetamorphicCycle.transformed?(c),
+                completed_at:      c[:completed_at]
               }
             end
           end
 
           def most_transformed_domains
             domain_counts = @completed_cycles
-              .select { |c| MetamorphicCycle.transformed?(c) }
-              .group_by { |c| c[:domain] }
-              .transform_values(&:count)
+                            .select { |c| MetamorphicCycle.transformed?(c) }
+                            .group_by { |c| c[:domain] }
+                            .transform_values(&:count)
             domain_counts.sort_by { |_, count| -count }.to_h
           end
 

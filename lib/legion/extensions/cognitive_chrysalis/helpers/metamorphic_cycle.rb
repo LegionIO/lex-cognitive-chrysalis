@@ -45,9 +45,7 @@ module Legion
             update_dissolution_depth!(updated, advanced_phase)
             update_emergence_score!(updated, advanced_phase)
 
-            if TransformationPhase.complete?(advanced_phase)
-              handle_phase_completion!(updated)
-            end
+            handle_phase_completion!(updated) if TransformationPhase.complete?(advanced_phase)
 
             updated
           end

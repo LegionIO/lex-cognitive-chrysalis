@@ -22,7 +22,7 @@ module Legion
           def metamorphic_readiness(engine: nil, **)
             engine ||= default_engine
             readiness = engine.metamorphic_readiness
-            label = Constants.label_for(Constants::READINESS_LABELS, readiness)
+            label = Helpers::Constants.label_for(Helpers::Constants::READINESS_LABELS, readiness)
             Legion::Logging.debug "[chrysalis] metamorphic_readiness=#{readiness.round(3)} label=#{label}"
             { success: true, readiness: readiness, label: label }
           end
